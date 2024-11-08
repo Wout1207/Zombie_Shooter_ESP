@@ -3,8 +3,11 @@
 #include <SPI.h>
 #include <MFRC522.h>
 
-#define RST_PIN 4    // RST pin for RC522
-#define SS_PIN 21    // SDA/SS pin for RC522
+#define SS_PIN 8       // Chip Select pin
+#define RST_PIN 3     // Reset pin
+#define SCK_PIN 18     // SPI Clock pin
+#define MOSI_PIN 11    // Master Out Slave In pin
+#define MISO_PIN 13    // Master In Slave Out pin
 
 MFRC522 rfid(SS_PIN, RST_PIN);
 
@@ -44,7 +47,7 @@ void setup() {
   //Initialize Serial Monitor
   Serial.begin(115200);
 
-  SPI.begin();
+  SPI.begin(SCK_PIN, MISO_PIN, MOSI_PIN, SS_PIN);  // Init SPI bus with custom pins
   rfid.PCD_Init();
   Serial.println("Scan RFID tag");
   
