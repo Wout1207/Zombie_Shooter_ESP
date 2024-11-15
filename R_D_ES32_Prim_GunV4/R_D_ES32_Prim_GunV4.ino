@@ -199,6 +199,9 @@ void processData(){
 
   //-----------------mags(RFID)-----------------
   RFID();
+
+  //-----------------vibration-----------------
+  Vibration();
 }
 
 
