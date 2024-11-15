@@ -11,7 +11,7 @@
 
 MPU6050 mpu;
 #define INTERRUPT_PIN 47  // W Set the interrupt pin
-const int vib_pin = 21; // GPIO pin connected to the Vibration Module
+const int vib_pin = 14; // GPIO pin connected to the Vibration Module
 const int trigger_pin = 48;
 int lastTriggerState = 1;
 
@@ -22,8 +22,8 @@ const unsigned long interval = 100; // Interval in milliseconds (100 ms for 10 F
 
 
 //----------ESP now----------- 
-// uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 divice 2
-uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub
+uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 divice 2
+//uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -476,12 +476,12 @@ void SendTriggerStateEspNow(int State) {
 }
 
 // ================================================================
-// ===                   TRIGGER FUNCTIONS                      ===
+// ===                   VIBRATION FUNCTIONS                      ===
 // ================================================================
 
 void Vibration() {
   
-  if (triggerState == 1) {
+  if (lastTriggerState == 1) {
       digitalWrite(vib_pin, HIGH);
       delay(300);
       digitalWrite(vib_pin, LOW);
