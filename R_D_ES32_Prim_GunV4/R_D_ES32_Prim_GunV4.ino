@@ -22,8 +22,8 @@ const unsigned long interval = 100; // Interval in milliseconds (100 ms for 10 F
 
 
 //----------ESP now----------- 
-uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 divice 2
-//uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub
+// uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 hub divice 2
+uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -480,13 +480,22 @@ void SendTriggerStateEspNow(int State) {
 // ================================================================
 
 void Vibration() {
-  
-  if (lastTriggerState == 1) {
-      digitalWrite(vib_pin, HIGH);
-      delay(300);
-      digitalWrite(vib_pin, LOW);
-  }
+  unsigned long lastVibrationTime = 0; // Stores the last time the vibration started
+  const unsigned long vibrationDuration = 300; // Duration for which the vibration should be active
+  bool isVibrating = false; // Tracks whether the vibration is currently active
 
+  // Check if the trigger state is active
+    if (lastTriggerState == 1 && !isVibrating) {
+        digitalWrite(vib_pin, HIGH); // Start vibration
+        isVibrating = true; // Set vibration state
+        lastVibrationTime = millis(); // Record the start time
+    }
+
+    // Check if the vibration duration has elapsed
+    if (isVibrating && millis() - lastVibrationTime >= vibrationDuration) {
+        digitalWrite(vib_pin, LOW); // Stop vibration
+        isVibrating = false; // Reset vibration state
+    }
 }
 
 
