@@ -16,6 +16,11 @@ const int trigger_pin = 48;
 int lastTriggerState = 1;
 
 
+//---------slow down processes---------
+unsigned long previousMillis = 0; // Stores the last time data was processed
+const unsigned long interval = 100; // Interval in milliseconds (100 ms for 10 FPS)
+
+
 //----------ESP now----------- 
 uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 divice 2
 String success;
@@ -173,19 +178,26 @@ void setup() {
 // ================================================================
 
 void loop() {
+  unsigned long currentMillis = millis();
+  
+  // Check if it's time to process data
+  if (currentMillis - previousMillis >= interval) {
+    previousMillis = currentMillis;
 
+    processData();
+  }
+}
+
+
+void processData(){
   //-----------------MPU-----------------
-  // MPU();
+  MPU();
 
   //-----------------Trigger-----------------
-  // Trigger();
+  Trigger();
 
   //-----------------mags(RFID)-----------------
-  // RFID();
-
-  //-----------------Vibration motor-----------------
-  // Vibration();
-
+  RFID();
 }
 
 
