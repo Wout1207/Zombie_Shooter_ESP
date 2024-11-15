@@ -1,12 +1,12 @@
-const int VibPin = 21; // GPIO pin connected to the Vibration Module
+const int vib_pin = 21; // GPIO pin connected to the Vibration Module
 
 void setup() {
-  pinMode(VibPin, OUTPUT); // Set the vibration pin as output
+  pinMode(vib_pin, OUTPUT); // Set the vibration pin as output
 }
 
 void loop() {
-  digitalWrite(VibPin, HIGH);
+  digitalWrite(vib_pin, HIGH);
   delay(300);
-  digitalWrite(VibPin, LOW);
+  digitalWrite(vib_pin, LOW);
   delay(2000);
 }

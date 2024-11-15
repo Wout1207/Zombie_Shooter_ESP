@@ -11,6 +11,7 @@
 
 MPU6050 mpu;
 #define INTERRUPT_PIN 47  // W Set the interrupt pin
+const int vib_pin = 21; // GPIO pin connected to the Vibration Module
 const int trigger_pin = 48;
 int lastTriggerState = 1;
 
@@ -161,6 +162,9 @@ void setup() {
     Serial.println("Failed to initialize OLED display.");
     // Handle the failure case, like displaying an error or retrying
   }
+
+  //-------------------Vibration motor--------------
+  pinMode(vib_pin, OUTPUT); // Set the vibration pin as output
 }
 
 
@@ -178,6 +182,9 @@ void loop() {
 
   //-----------------mags(RFID)-----------------
   // RFID();
+
+  //-----------------Vibration motor-----------------
+  // Vibration();
 
 }
 
@@ -453,6 +460,20 @@ void SendTriggerStateEspNow(int State) {
   } else {
     Serial.println("Error sending trigger state");
   }
+}
+
+// ================================================================
+// ===                   TRIGGER FUNCTIONS                      ===
+// ================================================================
+
+void Vibration() {
+  
+  if (triggerState == 1) {
+      digitalWrite(vib_pin, HIGH);
+      delay(300);
+      digitalWrite(vib_pin, LOW);
+  }
+
 }
 
 
