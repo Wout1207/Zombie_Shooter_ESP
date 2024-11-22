@@ -11,6 +11,7 @@
 
 MPU6050 mpu;
 #define INTERRUPT_PIN 47  // W Set the interrupt pin
+#define mpu_i2c_Address 0x68 //adress of the mpu
 const int vib_pin = 14; // GPIO pin connected to the Vibration Module
 const int trigger_pin = 48;
 int lastTriggerState = 1;
@@ -105,8 +106,9 @@ void setup() {
 
   while (!Serial)
     ;  // wait for Leonardo enumeration, others continue immediately
-
   mpu.initialize();
+
+  //mpu.initialize(mpu_i2c_Address);
   pinMode(INTERRUPT_PIN, INPUT);  // W Setup the interrupt pin as a input
   devStatus = mpu.dmpInitialize();
   mpu.setXGyroOffset(83);  // last set 18/10/2024 using uduino_zero script
