@@ -13,6 +13,7 @@ uint16_t photoTransistorLowDeviations[6] = {0,0,0,0,0,0};
 void setup() {
 
   Serial.begin(115200);
+  Serial.println("Setup");
 
   photoTransistorsSetup();
 
@@ -25,6 +26,7 @@ void setup() {
 void loop() {
 
   photoTransistorsLoop();
+  //Serial.println("Loop");
 
 }
 
@@ -96,6 +98,7 @@ void photoTransistorsLoop() {
       grenadeDetected = false;
       // deze lijn weghalen als het werkt:
       Serial.println("Grenade no longer detected");
+      return;
     }
   }
 
