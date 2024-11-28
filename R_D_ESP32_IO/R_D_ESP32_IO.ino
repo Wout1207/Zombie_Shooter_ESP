@@ -1,18 +1,25 @@
 #include <esp_now.h>
 #include <WiFi.h>
+#include "esp_timer.h"
 
+// Variables for the grenades
 bool grenadeDetected = false;
-const uint8_t photoTransistorPins[6] = {35,36,37,38,39,40};
+const uint8_t photoTransistorPins[6] = {5, 6, 7, 8, 9, 10};
 uint16_t photoTransistorReferences[6] = {0,0,0,0,0,0};
 uint16_t photoTransistorValues[6] = {0,0,0,0,0,0};
 uint16_t photoTransistorHighDeviations[6] = {0,0,0,0,0,0};
 uint16_t photoTransistorLowDeviations[6] = {0,0,0,0,0,0};
 
+// Variables for the movement sheets
 const uint8_t pressureSheetPins[4] = {1, 2, 3, 4};
 uint16_t pressureSheetValues[4] = {0, 0, 0, 0};
 uint16_t pressureSheetLowThresholds[4] = {0, 0, 0, 0};
 uint16_t pressureSheetHighThresholds[4] = {0, 0, 0, 0};
 bool pressureSheetToggle[4] = {false, false, false, false};
+
+// Variables for the timer
+volatile bool timerFlag = false;
+esp_timer_handle_t timerHandle;
 
 // choose the correct address for the hub
 //uint8_t hubAddress[] = { 0xC4, 0x4F, 0x33, 0x41, 0x46, 0x99 };
@@ -41,15 +48,14 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 // ================================================================
 
 void setup() {
-
+  Serial.begin(115200);
   Serial.println("Setup");
 
-  Serial.begin(115200);
   analogReadResolution(12);
   espNowSetup();
   pressureSheetsSetup();
   photoTransistorsSetup();
-
+  timerSetup();
 }
 
 // ================================================================
@@ -57,14 +63,15 @@ void setup() {
 // ================================================================
 
 void loop() {
-
   pressureSheetsLoop();
   photoTransistorsLoop();
-  timerLoop();
-  // ik weet niet of deze delay problemen gaat geven met de timer enzo
-  // de delay stond eerst in de pressureSheetsLoop functie
-  delay(5);
 
+  if (timerFlag) {
+    timerFlag = false;
+    resetReferences();
+  }
+
+  delay(5);
 }
 
 // ================================================================
@@ -73,7 +80,7 @@ void loop() {
 
 void espNowSetup() {
 
-    WiFi.mode(WIFI_STA);
+  WiFi.mode(WIFI_STA);
 
   if (esp_now_init() != ESP_OK) {
     Serial.println("Error initializing ESP-NOW");
@@ -92,7 +99,6 @@ void espNowSetup() {
     Serial.println("Failed to add peer");
     return;
   }
-
 }
 
 // ================================================================
@@ -100,7 +106,6 @@ void espNowSetup() {
 // ================================================================
 
 void pressureSheetsSetup() {
-
   for (int i = 0; i < 4; i++) {
     pressureSheetLowThresholds[i] = analogRead(pressureSheetPins[i]) / 3;
     pressureSheetHighThresholds[i] = analogRead(pressureSheetPins[i]) / 2;
@@ -111,7 +116,6 @@ void pressureSheetsSetup() {
     Serial.print(", High Threshold = ");
     Serial.println(pressureSheetHighThresholds[i]);
   }
-
 }
 
 // ================================================================
@@ -119,7 +123,6 @@ void pressureSheetsSetup() {
 // ================================================================
 
 void photoTransistorsSetup() {
-
     for (int i=0; i<6; i++) {
     pinMode(photoTransistorPins[i], INPUT);
     photoTransistorReferences[i] = analogRead(photoTransistorPins[i]);
@@ -134,7 +137,28 @@ void photoTransistorsSetup() {
     Serial.print("Low deviation :");
     Serial.println(photoTransistorLowDeviations[i]);
   }
+}
 
+// ================================================================
+// ===                    TIMER CALLBACK                        ===
+// ================================================================
+
+void timerCallback(void* arg) {
+  timerFlag = true;
+}
+
+// ================================================================
+// ===                      TIMER SETUP                         ===
+// ================================================================
+
+void timerSetup() {
+  // Configure the timer
+  const esp_timer_create_args_t timerArgs = {
+    .callback = &timerCallback,
+    .arg = NULL,
+  };
+  esp_timer_create(&timerArgs, &timerHandle);
+  esp_timer_start_periodic(timerHandle, 60000000); // Time is in microseconds
 }
 
 // ================================================================
@@ -177,20 +201,25 @@ void pressureSheetsLoop() {
 
 void photoTransistorsLoop() {
 
+  for (int i=0; i<6; i++) {
+    photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
+  }
+
   // grote if statement: als grenadeDetected false is gaat ge alles bekijken
   // met de high deviation en eventueel switchen naar true
   // dan gaat ge verzenden naar de hub dat de grenade detected is
 
   if (!grenadeDetected) {
     for (int i=0; i<6; i++) {
-      photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
       if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i]
       || photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
         grenadeDetected = true;
         Serial.println("Grenade detected");
         char message[10];
-        message[0] = 'g';
-        message[1] = '\0'; // Null-terminate the string
+        // message[0] = 'g';
+        // message[1] = '\0'; // Null-terminate the string
+        // esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+        snprintf(message, sizeof(message), "g");
         esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
         while (result != ESP_OK) {
           result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
@@ -205,9 +234,8 @@ void photoTransistorsLoop() {
   // met de low deviation
   // dan gaat ge niks verzenden maar zet ge grenadeDetected terug op false
 
-  else if (grenadeDetected) {
+  else { // deze if moest niet meer
     for (int i=0; i<6; i++) {
-      photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
       if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorLowDeviations[i]
       || photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
         break;
@@ -224,11 +252,16 @@ void photoTransistorsLoop() {
 // ===                     TIMER LOOP                           ===
 // ================================================================
 
-void timerLoop() {
-
-  // TO DO
-  // een if statement waar ge gaat kijken of er meer dan een minuut verstreken is met de timer
-  // als dat zo is gaat ge nieuwe referenties nemen om drift te vermijden en reset ge de timer?
-
+void resetReferences() {
+  Serial.println("Reset reference function");
+  if (!grenadeDetected) {
+    // Reset reference of grenades
+    photoTransistorsSetup();
+  }
+  for (int i = 0; i < 4; i++) {
+    if (pressureSheetToggle[i]) return;
+  }
+  // Reset references of pressure sheets
+  pressureSheetsSetup();
 }
 
