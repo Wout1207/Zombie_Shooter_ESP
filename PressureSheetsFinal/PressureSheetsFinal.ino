@@ -48,7 +48,7 @@ void setup() {
   analogReadResolution(12);
   for (int i = 0; i < 4; i++) {
     pressureSheetLowThresholds[i] = analogRead(pressureSheetPins[i]) / 3;
-    pressureSheetHighThresholds[i] = analogRead(pressureSheetPins[i]) / 2;
+    pressureSheetHighThresholds[i] = 2 * analogRead(pressureSheetPins[i]) / 3;
     Serial.print("Pin ");
     Serial.print(pressureSheetPins[i]);
     Serial.print(": Low Threshold = ");
