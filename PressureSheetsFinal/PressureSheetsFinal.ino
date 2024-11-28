@@ -7,8 +7,9 @@ uint16_t pressureSheetLowThresholds[4] = {0, 0, 0, 0};
 uint16_t pressureSheetHighThresholds[4] = {0, 0, 0, 0};
 bool pressureSheetToggle[4] = {false, false, false, false};
 
-uint8_t hubAddress[] = { 0xC4, 0x4F, 0x33, 0x41, 0x46, 0x99 };
-// uint8_t hubAddress[] = { 0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C };
+//uint8_t hubAddress[] = { 0xC4, 0x4F, 0x33, 0x41, 0x46, 0x99 };
+//uint8_t hubAddress[] = { 0x84, 0xF7, 0x03, 0x88, 0xEC, 0xDA }; //this is an s2 with the mac address on it
+uint8_t hubAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 hub divice 2
 esp_now_peer_info_t peerInfo;
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
