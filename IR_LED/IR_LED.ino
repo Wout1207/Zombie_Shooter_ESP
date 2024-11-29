@@ -1,21 +1,45 @@
-bool grenadeDetected = false;
-const uint8_t photoTransistorPins[6] = {35,36,37,38,39,40};
-uint16_t photoTransistorReferences[6] = {0,0,0,0,0,0};
-uint16_t photoTransistorValues[6] = {0,0,0,0,0,0};
-uint16_t photoTransistorHighDeviations[6] = {0,0,0,0,0,0};
-uint16_t photoTransistorLowDeviations[6] = {0,0,0,0,0,0};
+#define CONVERSIONS_PER_PIN 10
 
+bool grenadeDetected[] = {false, false, false, false, false, false};
+uint8_t photoTransistorPins[] = {1,2,3,4,5,6};
+uint16_t photoTransistorReferences[] = {0,0,0,0,0,0};
+uint16_t photoTransistorValues[] = {0,0,0,0,0,0};
+uint16_t photoTransistorHighDeviations[] = {0,0,0,0,0,0};
+uint16_t photoTransistorLowDeviations[] = {0,0,0,0,0,0};
+
+uint8_t counter = 0;
+
+// Calculate how many pins are declared in the array - needed as input for the setup function of ADC Continuous
+uint8_t adc_pins_count = 6;
+
+// Flag which will be set in ISR when conversion is done
+volatile bool adc_coversion_done = false;
+
+// Result structure for ADC Continuous reading
+adc_continuous_data_t *result = NULL;
+
+// ISR Function that will be triggered when ADC conversion is done
+void ARDUINO_ISR_ATTR adcComplete() {
+  adc_coversion_done = true;
+}
 
 // ================================================================
 // ===               SETUP FUNCTION                             ===
 // ================================================================
 
 void setup() {
-
   Serial.begin(115200);
-  Serial.println("Setup");
-
-  photoTransistorsSetup();
+  // Optional for ESP32: Set the resolution to 9-12 bits (default is 12 bits)
+  analogContinuousSetWidth(12);
+  // Optional: Set different attenaution (default is ADC_11db)
+  analogContinuousSetAtten(ADC_11db);
+  // Setup ADC Continuous with following input:
+  // array of pins, count of the pins, how many conversions per pin in one cycle will happen, sampling frequency, callback function
+  analogContinuous(photoTransistorPins, adc_pins_count, CONVERSIONS_PER_PIN, 20000, &adcComplete);
+  // Start ADC Continuous conversions
+  analogContinuousStart();
+  counter = 9;
+  // photoTransistorsSetup();
 
 }
 
@@ -24,9 +48,20 @@ void setup() {
 // ================================================================
 
 void loop() {
-
-  photoTransistorsLoop();
+  if (adc_coversion_done == true) {
+    adc_coversion_done = false;
+    if (counter < 9) {
+      photoTransistorsLoop();
+      counter++;
+    }
+    else {
+      photoTransistorsSetup();
+      counter = 0;
+    }
+  }
+  // photoTransistorsLoop();
   //Serial.println("Loop");
+  // delay(25);
 
 }
 
@@ -34,74 +69,118 @@ void loop() {
 // ===               PHOTO TRANSISTORS SETUP                    ===
 // ================================================================
 
+// void photoTransistorsSetup() {
+
+//     for (int i=0; i<6; i++) {
+//     pinMode(photoTransistorPins[i], INPUT);
+//     photoTransistorReferences[i] = analogRead(photoTransistorPins[i]);
+//     photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
+//     photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
+
+//     // TODO: zodra het werkt onderstaande lijnen verwijderen
+//     Serial.println (i);
+//     Serial.print("Reference :");
+//     Serial.println(photoTransistorReferences[i]);
+//     Serial.print("High deviation :");
+//     Serial.println(photoTransistorHighDeviations[i]);
+//     Serial.print("Low deviation :");
+//     Serial.println(photoTransistorLowDeviations[i]);
+//   }
+
+// }
+
 void photoTransistorsSetup() {
-
-    for (int i=0; i<6; i++) {
-    pinMode(photoTransistorPins[i], INPUT);
-    photoTransistorReferences[i] = analogRead(photoTransistorPins[i]);
-    photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
-    photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
-
-    // TODO: zodra het werkt onderstaande lijnen verwijderen
-    Serial.println (i);
-    Serial.print("Reference :");
-    Serial.println(photoTransistorReferences[i]);
-    Serial.print("High deviation :");
-    Serial.println(photoTransistorHighDeviations[i]);
-    Serial.print("Low deviation :");
-    Serial.println(photoTransistorLowDeviations[i]);
+  if (analogContinuousRead(&result, 0)) {
+    analogContinuousStop();
+    for (int i = 0; i < adc_pins_count; i++) {
+      // Serial.printf("\nADC PIN %d data:", result[i].pin);
+      // Serial.printf("\n   Avg raw value = %d", result[i].avg_read_raw);
+      // Serial.printf("\n   Avg millivolts value = %d", result[i].avg_read_mvolts);
+      photoTransistorReferences[i] = result[i].avg_read_raw;
+      photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
+      photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
+      Serial.println (i);
+      Serial.print("Reference :");
+      Serial.println(photoTransistorReferences[i]);
+      Serial.print("High deviation :");
+      Serial.println(photoTransistorHighDeviations[i]);
+      Serial.print("Low deviation :");
+      Serial.println(photoTransistorLowDeviations[i]);
+    }
+    analogContinuousStart();
+  } else {
+    Serial.println("Error occurred during reading data. Set Core Debug Level to error or lower for more information.");
   }
-
 }
 
 // ================================================================
 // ===               PHOTO TRANSISTORS LOOP                     ===
 // ================================================================
 
+// void photoTransistorsLoop() {
+//   for (int i = 0; i < 6; i++) {
+//     photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
+//     if (!grenadeDetected[i]) {
+//       if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i] ||
+//           photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
+//         Serial.print("Pin: ");
+//         Serial.print(photoTransistorPins[i]);
+//         Serial.print(" Value: ");
+//         Serial.print(photoTransistorValues[i]);
+//         Serial.println(" Grenade detected");
+//         grenadeDetected[i] = true;
+//       }
+//     }
+//     else {
+//       if (photoTransistorValues[i] < photoTransistorReferences[i] + photoTransistorLowDeviations[i] &&
+//           photoTransistorValues[i] > photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
+//         Serial.print("Pin: ");
+//         Serial.print(photoTransistorPins[i]);
+//         Serial.print(" Value: ");
+//         Serial.print(photoTransistorValues[i]);
+//         Serial.println(" No Grenade detected");
+//         grenadeDetected[i] = false;
+//       }
+//     }
+//   }
+// }
+
 void photoTransistorsLoop() {
-
-  // grote if statement: als grenadeDetected false is gaat ge alles bekijken
-  // met de high deviation en eventueel switchen naar true
-  // TODO
-  // dan gaat ge verzenden naar de hub dat de grenade detected is
-  // en in deze if statement nog een if statement waar ge gaat kijken of er meer dan een minuut verstreken is met de timer
-  // als dat zo is gaat ge nieuwe referenties nemen om drift te vermijden en reset ge de timer?
-
-  if (!grenadeDetected) {
-    for (int i=0; i<6; i++) {
-      photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
-      if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i]
-      || photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
-        grenadeDetected = true;
-        // deze lijn weghalen als het werkt:
-        Serial.println("Grenade detected");
-        break;
+  // Read data from ADC
+  if (analogContinuousRead(&result, 0)) {
+    analogContinuousStop();
+    for (int i = 0; i < adc_pins_count; i++) {
+      // Serial.printf("\nADC PIN %d data:", result[i].pin);
+      // Serial.printf("\n   Avg raw value = %d", result[i].avg_read_raw);
+      // Serial.printf("\n   Avg millivolts value = %d", result[i].avg_read_mvolts);
+      photoTransistorValues[i] = result[i].avg_read_raw;
+      if (!grenadeDetected[i]) {
+        if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i] ||
+            photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
+          Serial.print("Pin: ");
+          Serial.print(photoTransistorPins[i]);
+          Serial.print(" Value: ");
+          Serial.print(photoTransistorValues[i]);
+          Serial.println(" Grenade detected");
+          grenadeDetected[i] = true;
+        }
+      }
+      else {
+        if (photoTransistorValues[i] < photoTransistorReferences[i] + photoTransistorLowDeviations[i] &&
+            photoTransistorValues[i] > photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
+          Serial.print("Pin: ");
+          Serial.print(photoTransistorPins[i]);
+          Serial.print(" Value: ");
+          Serial.print(photoTransistorValues[i]);
+          Serial.println(" No Grenade detected");
+          grenadeDetected[i] = false;
+        }
       }
     }
-
-    // TODO
-
+    analogContinuousStart();
+  } else {
+    Serial.println("Error occurred during reading data. Set Core Debug Level to error or lower for more information.");
   }
-
-
-  // grote else if statement: als grenadeDetected true is gaat ge alles bekijken
-  // met de low deviation
-  // dan gaat ge niks verzenden maar zet ge grenadeDetected terug op false
-
-  else if (grenadeDetected) {
-    for (int i=0; i<6; i++) {
-      photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
-      if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorLowDeviations[i]
-      || photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
-        break;
-      }
-      grenadeDetected = false;
-      // deze lijn weghalen als het werkt:
-      Serial.println("Grenade no longer detected");
-      return;
-    }
-  }
-
 }
 
 
