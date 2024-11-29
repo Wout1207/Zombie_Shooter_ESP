@@ -1,5 +1,6 @@
 #define CONVERSIONS_PER_PIN 10
 
+bool grenadeThrown = false;
 bool grenadeDetected[] = {false, false, false, false, false, false};
 uint8_t photoTransistorPins[] = {1,2,3,4,5,6};
 uint16_t photoTransistorReferences[] = {0,0,0,0,0,0};
@@ -71,9 +72,6 @@ void photoTransistorsSetup() {
   if (analogContinuousRead(&result, 0)) {
     analogContinuousStop();
     for (int i = 0; i < adc_pins_count; i++) {
-      // Serial.printf("\nADC PIN %d data:", result[i].pin);
-      // Serial.printf("\n   Avg raw value = %d", result[i].avg_read_raw);
-      // Serial.printf("\n   Avg millivolts value = %d", result[i].avg_read_mvolts);
       photoTransistorReferences[i] = result[i].avg_read_raw;
       photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
       photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
@@ -100,34 +98,48 @@ void photoTransistorsLoop() {
   // Read data from ADC
   if (analogContinuousRead(&result, 0)) {
     analogContinuousStop();
+    bool allGrenadesCleared = true;
     for (int i = 0; i < adc_pins_count; i++) {
-      // Serial.printf("\nADC PIN %d data:", result[i].pin);
-      // Serial.printf("\n   Avg raw value = %d", result[i].avg_read_raw);
-      // Serial.printf("\n   Avg millivolts value = %d", result[i].avg_read_mvolts);
       photoTransistorValues[i] = result[i].avg_read_raw;
       if (!grenadeDetected[i]) {
         if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i] ||
             photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
-          Serial.print("Pin: ");
-          Serial.print(photoTransistorPins[i]);
-          Serial.print(" Value: ");
-          Serial.print(photoTransistorValues[i]);
-          Serial.println(" Grenade detected");
+          // Serial.print("Pin: ");
+          // Serial.print(photoTransistorPins[i]);
+          // Serial.print(" Value: ");
+          // Serial.print(photoTransistorValues[i]);
+          // Serial.println(" Grenade detected");
           grenadeDetected[i] = true;
         }
       }
       else {
         if (photoTransistorValues[i] < photoTransistorReferences[i] + photoTransistorLowDeviations[i] &&
             photoTransistorValues[i] > photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
-          Serial.print("Pin: ");
-          Serial.print(photoTransistorPins[i]);
-          Serial.print(" Value: ");
-          Serial.print(photoTransistorValues[i]);
-          Serial.println(" No Grenade detected");
+          // Serial.print("Pin: ");
+          // Serial.print(photoTransistorPins[i]);
+          // Serial.print(" Value: ");
+          // Serial.print(photoTransistorValues[i]);
+          // Serial.println(" No Grenade detected");
           grenadeDetected[i] = false;
         }
       }
+
+      if (grenadeDetected[i]) {
+        allGrenadesCleared = false;
+      }
     }
+
+    // If any grenade is detected, set grenadeThrown to true and send the message
+    if (!grenadeThrown && !allGrenadesCleared) {
+      grenadeThrown = true;
+      Serial.println("Grenade thrown! Message sent.");
+    }
+    // Reset grenadeThrown to false if all grenades are cleared
+    if (grenadeThrown && allGrenadesCleared) {
+      grenadeThrown = false;
+      Serial.println("Grenades cleared.");
+    }
+    
     analogContinuousStart();
   } else {
     Serial.println("Error occurred during reading data. Set Core Debug Level to error or lower for more information.");
