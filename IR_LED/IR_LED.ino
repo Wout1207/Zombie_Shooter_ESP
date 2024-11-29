@@ -52,16 +52,13 @@ void loop() {
     adc_coversion_done = false;
     if (counter < 9) {
       photoTransistorsLoop();
-      counter++;
+      // counter++;
     }
     else {
       photoTransistorsSetup();
       counter = 0;
     }
   }
-  // photoTransistorsLoop();
-  //Serial.println("Loop");
-  // delay(25);
 
 }
 
@@ -69,25 +66,6 @@ void loop() {
 // ===               PHOTO TRANSISTORS SETUP                    ===
 // ================================================================
 
-// void photoTransistorsSetup() {
-
-//     for (int i=0; i<6; i++) {
-//     pinMode(photoTransistorPins[i], INPUT);
-//     photoTransistorReferences[i] = analogRead(photoTransistorPins[i]);
-//     photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
-//     photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
-
-//     // TODO: zodra het werkt onderstaande lijnen verwijderen
-//     Serial.println (i);
-//     Serial.print("Reference :");
-//     Serial.println(photoTransistorReferences[i]);
-//     Serial.print("High deviation :");
-//     Serial.println(photoTransistorHighDeviations[i]);
-//     Serial.print("Low deviation :");
-//     Serial.println(photoTransistorLowDeviations[i]);
-//   }
-
-// }
 
 void photoTransistorsSetup() {
   if (analogContinuousRead(&result, 0)) {
@@ -117,33 +95,6 @@ void photoTransistorsSetup() {
 // ===               PHOTO TRANSISTORS LOOP                     ===
 // ================================================================
 
-// void photoTransistorsLoop() {
-//   for (int i = 0; i < 6; i++) {
-//     photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
-//     if (!grenadeDetected[i]) {
-//       if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i] ||
-//           photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
-//         Serial.print("Pin: ");
-//         Serial.print(photoTransistorPins[i]);
-//         Serial.print(" Value: ");
-//         Serial.print(photoTransistorValues[i]);
-//         Serial.println(" Grenade detected");
-//         grenadeDetected[i] = true;
-//       }
-//     }
-//     else {
-//       if (photoTransistorValues[i] < photoTransistorReferences[i] + photoTransistorLowDeviations[i] &&
-//           photoTransistorValues[i] > photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
-//         Serial.print("Pin: ");
-//         Serial.print(photoTransistorPins[i]);
-//         Serial.print(" Value: ");
-//         Serial.print(photoTransistorValues[i]);
-//         Serial.println(" No Grenade detected");
-//         grenadeDetected[i] = false;
-//       }
-//     }
-//   }
-// }
 
 void photoTransistorsLoop() {
   // Read data from ADC
