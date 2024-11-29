@@ -1,31 +1,49 @@
 #include <esp_now.h>
 #include <WiFi.h>
-#include "esp_timer.h"
+// #include "esp_timer.h"
+#define CONVERSIONS_PER_PIN 10
 
 // Variables for the grenades
-bool grenadeDetected = false;
-const uint8_t photoTransistorPins[6] = {5, 6, 7, 8, 9, 10};
-uint16_t photoTransistorReferences[6] = {0,0,0,0,0,0};
-uint16_t photoTransistorValues[6] = {0,0,0,0,0,0};
-uint16_t photoTransistorHighDeviations[6] = {0,0,0,0,0,0};
-uint16_t photoTransistorLowDeviations[6] = {0,0,0,0,0,0};
+bool grenadeThrown = false;
+bool grenadeDetected[] = {false, false, false, false, false, false};
+uint8_t photoTransistorPins[] = {1,2,3,4,5,6,7,8,9,10};
+uint16_t photoTransistorReferences[] = {0,0,0,0,0,0};
+uint16_t photoTransistorValues[] = {0,0,0,0,0,0};
+uint16_t photoTransistorHighDeviations[] = {0,0,0,0,0,0};
+uint16_t photoTransistorLowDeviations[] = {0,0,0,0,0,0};
 
 // Variables for the movement sheets
-const uint8_t pressureSheetPins[4] = {1, 2, 3, 4};
-uint16_t pressureSheetValues[4] = {0, 0, 0, 0};
-uint16_t pressureSheetLowThresholds[4] = {0, 0, 0, 0};
-uint16_t pressureSheetHighThresholds[4] = {0, 0, 0, 0};
-bool pressureSheetToggle[4] = {false, false, false, false};
+const uint8_t pressureSheetPins[] = {7,8,9,10};
+uint16_t pressureSheetValues[] = {0, 0, 0, 0};
+uint16_t pressureSheetLowThresholds[] = {0, 0, 0, 0};
+uint16_t pressureSheetHighThresholds[] = {0, 0, 0, 0};
+bool pressureSheetToggle[] = {false, false, false, false};
 
 // Variables for the timer
-volatile bool timerFlag = false;
-esp_timer_handle_t timerHandle;
+// volatile bool timerFlag = false;
+// esp_timer_handle_t timerHandle;
+uint8_t counter = 0;
+
+// Variables for adc
+// Calculate how many pins are declared in the array - needed as input for the setup function of ADC Continuous
+uint8_t adc_pins_count = 10;
+// Flag which will be set in ISR when conversion is done
+volatile bool adc_coversion_done = false;
+// Result structure for ADC Continuous reading
+adc_continuous_data_t *result = NULL;
+// ISR Function that will be triggered when ADC conversion is done
+void ARDUINO_ISR_ATTR adcComplete() {
+  adc_coversion_done = true;
+}
 
 // choose the correct address for the hub
 //uint8_t hubAddress[] = { 0xC4, 0x4F, 0x33, 0x41, 0x46, 0x99 };
+// uint8_t hubAddress[] = { 0x98, 0x3D, 0xAE, 0xEC, 0xCB, 0x5C };
 //uint8_t hubAddress[] = { 0x84, 0xF7, 0x03, 0x88, 0xEC, 0xDA }; // s2 with the mac address on it
-uint8_t hubAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C};     // s3 number 2
+// uint8_t hubAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C};     // s3 number 2
+uint8_t hubAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0};     // s3 number 3
 esp_now_peer_info_t peerInfo;
+
 
 
 // ================================================================
@@ -49,13 +67,9 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("Setup");
-
-  analogReadResolution(12);
   espNowSetup();
-  pressureSheetsSetup();
-  photoTransistorsSetup();
-  timerSetup();
+  // timerSetup();
+  adcSetup();
 }
 
 // ================================================================
@@ -63,17 +77,27 @@ void setup() {
 // ================================================================
 
 void loop() {
-  pressureSheetsLoop();
-  photoTransistorsLoop();
-
-  if (timerFlag) {
-    timerFlag = false;
-    resetReferences();
+  if (adc_coversion_done == true) {
+    adc_coversion_done = false;
+    if (counter < 9) {
+      photoTransistorsLoop();
+      // counter++;
+    }
+    else {
+      setReferences();
+      counter = 0;
+    }
   }
 
-  delay(5);
-}
 
+  // if (timerFlag) {
+  //   timerFlag = false;
+  //   resetReferences();
+  // }
+
+  // delay(5);
+}
+  
 // ================================================================
 // ===                  ESP NOW SETUP                           ===
 // ================================================================
@@ -102,40 +126,54 @@ void espNowSetup() {
 }
 
 // ================================================================
-// ===                 PRESSURE SHEETS SETUP                    ===
+// ===                       ADC SETUP                          ===
 // ================================================================
 
-void pressureSheetsSetup() {
-  for (int i = 0; i < 4; i++) {
-    pressureSheetLowThresholds[i] = analogRead(pressureSheetPins[i]) / 3;
-    pressureSheetHighThresholds[i] = analogRead(pressureSheetPins[i]) / 2;
-    Serial.print("Pin ");
-    Serial.print(pressureSheetPins[i]);
-    Serial.print(": Low Threshold = ");
-    Serial.print(pressureSheetLowThresholds[i]);
-    Serial.print(", High Threshold = ");
-    Serial.println(pressureSheetHighThresholds[i]);
-  }
+void adcSetup() {
+  // Optional for ESP32: Set the resolution to 9-12 bits (default is 12 bits)
+  analogContinuousSetWidth(12);
+  // Optional: Set different attenaution (default is ADC_11db)
+  analogContinuousSetAtten(ADC_11db);
+  // Setup ADC Continuous with following input:
+  // array of pins, count of the pins, how many conversions per pin in one cycle will happen, sampling frequency, callback function
+  analogContinuous(photoTransistorPins, adc_pins_count, CONVERSIONS_PER_PIN, 20000, &adcComplete);
+  // Start ADC Continuous conversions
+  analogContinuousStart();
+  counter = 9;
 }
 
 // ================================================================
-// ===               PHOTO TRANSISTORS SETUP                    ===
+// ===              REFERENCE SETTING FUNCTION                  ===
 // ================================================================
 
-void photoTransistorsSetup() {
-    for (int i=0; i<6; i++) {
-    pinMode(photoTransistorPins[i], INPUT);
-    photoTransistorReferences[i] = analogRead(photoTransistorPins[i]);
-    photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
-    photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
-
-    Serial.println (i);
-    Serial.print("Reference :");
-    Serial.println(photoTransistorReferences[i]);
-    Serial.print("High deviation :");
-    Serial.println(photoTransistorHighDeviations[i]);
-    Serial.print("Low deviation :");
-    Serial.println(photoTransistorLowDeviations[i]);
+void setReferences() {
+  if (analogContinuousRead(&result, 0)) {
+    analogContinuousStop();
+    for (int i = 0; i < 6; i++) {
+      photoTransistorReferences[i] = result[i].avg_read_raw;
+      photoTransistorHighDeviations[i] = photoTransistorReferences[i] * 0.2;
+      photoTransistorLowDeviations[i] = photoTransistorReferences[i] * 0.1;
+      Serial.println (i);
+      Serial.print("Reference :");
+      Serial.println(photoTransistorReferences[i]);
+      Serial.print("High deviation :");
+      Serial.println(photoTransistorHighDeviations[i]);
+      Serial.print("Low deviation :");
+      Serial.println(photoTransistorLowDeviations[i]);
+    }
+    for (int i = 0; i < 4; i++) {
+      pressureSheetLowThresholds[i] = result[i + 6].avg_read_raw / 3;
+      pressureSheetHighThresholds[i] = pressureSheetLowThresholds[i] * 2;
+      Serial.print("Pin ");
+      Serial.print(pressureSheetPins[i]);
+      Serial.print(": Low Threshold = ");
+      Serial.print(pressureSheetLowThresholds[i]);
+      Serial.print(", High Threshold = ");
+      Serial.println(pressureSheetHighThresholds[i]);
+    }
+    analogContinuousStart();
+  } else {
+    Serial.println("Error occurred during reading data. Set Core Debug Level to error or lower for more information.");
   }
 }
 
@@ -143,23 +181,23 @@ void photoTransistorsSetup() {
 // ===                    TIMER CALLBACK                        ===
 // ================================================================
 
-void timerCallback(void* arg) {
-  timerFlag = true;
-}
+// void timerCallback(void* arg) {
+//   timerFlag = true;
+// }
 
 // ================================================================
 // ===                      TIMER SETUP                         ===
 // ================================================================
 
-void timerSetup() {
-  // Configure the timer
-  const esp_timer_create_args_t timerArgs = {
-    .callback = &timerCallback,
-    .arg = NULL,
-  };
-  esp_timer_create(&timerArgs, &timerHandle);
-  esp_timer_start_periodic(timerHandle, 60000000); // Time is in microseconds
-}
+// void timerSetup() {
+//   // Configure the timer
+//   const esp_timer_create_args_t timerArgs = {
+//     .callback = &timerCallback,
+//     .arg = NULL,
+//   };
+//   esp_timer_create(&timerArgs, &timerHandle);
+//   esp_timer_start_periodic(timerHandle, 60000000); // Time is in microseconds
+// }
 
 // ================================================================
 // ===                 PRESSURE SHEETS LOOP                     ===
@@ -172,23 +210,23 @@ void pressureSheetsLoop() {
     if (pressureSheetToggle[i] && pressureSheetValues[i] > pressureSheetHighThresholds[i]) {
       Serial.print(pressureSheetPins[i]);
       Serial.println(" off");
-      char message[10];
-      snprintf(message, sizeof(message), "m/%d/%d", i + 1, 0);
-      esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
-      while (result != ESP_OK) {
-        result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
-      }
+      // char message[10];
+      // snprintf(message, sizeof(message), "m/%d/%d", i + 1, 0);
+      // esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+      // while (result != ESP_OK) {
+      //   result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+      // }
       pressureSheetToggle[i] = false;
     }
     else if (!pressureSheetToggle[i] && pressureSheetValues[i] < pressureSheetLowThresholds[i]) {
       Serial.print(pressureSheetPins[i]);
       Serial.println(" on");
-      char message[10];
-      snprintf(message, sizeof(message), "m/%d/%d", i + 1, 1);
-      esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
-      while (result != ESP_OK) {
-        result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
-      }
+      // char message[10];
+      // snprintf(message, sizeof(message), "m/%d/%d", i + 1, 1);
+      // esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+      // while (result != ESP_OK) {
+      //   result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+      // }
       pressureSheetToggle[i] = true;
     }
   }
@@ -200,68 +238,100 @@ void pressureSheetsLoop() {
 // ================================================================
 
 void photoTransistorsLoop() {
+  // Read data from ADC
+  if (analogContinuousRead(&result, 0)) {
+    analogContinuousStop();
+    bool allGrenadesCleared = true;
+    for (int i = 0; i < adc_pins_count - 4; i++) {
+      photoTransistorValues[i] = result[i].avg_read_raw;
+      if (!grenadeDetected[i]) {
+        if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i] ||
+            photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
+          // Serial.print("Pin: ");
+          // Serial.print(photoTransistorPins[i]);
+          // Serial.print(" Value: ");
+          // Serial.print(photoTransistorValues[i]);
+          // Serial.println(" Grenade detected");
+          grenadeDetected[i] = true;
+        }
+      }
+      else {
+        if (photoTransistorValues[i] < photoTransistorReferences[i] + photoTransistorLowDeviations[i] &&
+            photoTransistorValues[i] > photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
+          // Serial.print("Pin: ");
+          // Serial.print(photoTransistorPins[i]);
+          // Serial.print(" Value: ");
+          // Serial.print(photoTransistorValues[i]);
+          // Serial.println(" No Grenade detected");
+          grenadeDetected[i] = false;
+        }
+      }
 
-  for (int i=0; i<6; i++) {
-    photoTransistorValues[i] = analogRead(photoTransistorPins[i]);
-  }
+      if (grenadeDetected[i]) {
+        allGrenadesCleared = false;
+      }
+    }
 
-  // grote if statement: als grenadeDetected false is gaat ge alles bekijken
-  // met de high deviation en eventueel switchen naar true
-  // dan gaat ge verzenden naar de hub dat de grenade detected is
+    // If any grenade is detected, set grenadeThrown to true and send the message
+    if (!grenadeThrown && !allGrenadesCleared) {
+      grenadeThrown = true;
+      char message[10];
+      snprintf(message, sizeof(message), "g");
+      esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+      Serial.println("Grenade thrown! Message sent.");
+    }
+    // Reset grenadeThrown to false if all grenades are cleared
+    if (grenadeThrown && allGrenadesCleared) {
+      grenadeThrown = false;
+      Serial.println("Grenades cleared.");
+    }
 
-  if (!grenadeDetected) {
-    for (int i=0; i<6; i++) {
-      if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i]
-      || photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
-        grenadeDetected = true;
-        Serial.println("Grenade detected");
+    for (int i = 6; i < adc_pins_count; i++) {
+      pressureSheetValues[i-6] = result[i].avg_read_raw;
+      if (pressureSheetToggle[i-6] && pressureSheetValues[i-6] > pressureSheetHighThresholds[i-6]) {
+        Serial.print(pressureSheetPins[i-6]);
+        Serial.println(" off");
         char message[10];
-        // message[0] = 'g';
-        // message[1] = '\0'; // Null-terminate the string
-        // esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
-        snprintf(message, sizeof(message), "g");
+        snprintf(message, sizeof(message), "m/%d/%d", i - 6 + 1, 0);
         esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
         while (result != ESP_OK) {
           result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
         }
-        // break om ervoor te zorgen dat er slechts 1 keer verzonden wordt als meerdere sensoren tegelijkertijd de granaat detecteren
-        break;
+        pressureSheetToggle[i-6] = false;
+      }
+      else if (!pressureSheetToggle[i-6] && pressureSheetValues[i-6] < pressureSheetLowThresholds[i-6]) {
+        Serial.print(pressureSheetPins[i-6]);
+        Serial.println(" on");
+        char message[10];
+        snprintf(message, sizeof(message), "m/%d/%d", i-6 + 1, 1);
+        esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+        while (result != ESP_OK) {
+          result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+        }
+        pressureSheetToggle[i-6] = true;
       }
     }
+    
+    analogContinuousStart();
+  } else {
+    Serial.println("Error occurred during reading data. Set Core Debug Level to error or lower for more information.");
   }
-
-  // grote else if statement: als grenadeDetected true is gaat ge alles bekijken
-  // met de low deviation
-  // dan gaat ge niks verzenden maar zet ge grenadeDetected terug op false
-
-  else { // deze if moest niet meer
-    for (int i=0; i<6; i++) {
-      if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorLowDeviations[i]
-      || photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
-        break;
-      }
-      grenadeDetected = false;
-      Serial.println("Grenade no longer detected");
-      return;
-    }
-  }
-
 }
 
 // ================================================================
 // ===                     TIMER LOOP                           ===
 // ================================================================
 
-void resetReferences() {
-  Serial.println("Reset reference function");
-  if (!grenadeDetected) {
-    // Reset reference of grenades
-    photoTransistorsSetup();
-  }
-  for (int i = 0; i < 4; i++) {
-    if (pressureSheetToggle[i]) return;
-  }
-  // Reset references of pressure sheets
-  pressureSheetsSetup();
-}
+// void resetReferences() {
+//   Serial.println("Reset reference function");
+//   if (!grenadeDetected) {
+//     // Reset reference of grenades
+//     photoTransistorsSetup();
+//   }
+//   for (int i = 0; i < 4; i++) {
+//     if (pressureSheetToggle[i]) return;
+//   }
+//   // Reset references of pressure sheets
+//   pressureSheetsSetup();
+// }
 
