@@ -1,3 +1,5 @@
+// git version
+
 #include "I2Cdev.h"
 #include "USB.h"
 #include "MPU6050_6Axis_MotionApps20.h"
@@ -12,23 +14,30 @@
 // difine the I2C pins
 #define I2C_SDA 6
 #define I2C_SCL 7
+// #define I2C_SDA 20 // actual gun
+// #define I2C_SCL 21 // actual gun
 
 MPU6050 mpu;
 #define INTERRUPT_PIN 47  // W Set the interrupt pin for MPU
 #define mpu_i2c_Address 0x68 //adress of the mpu
-const int vib_pin = 14; // GPIO pin connected to the Vibration Module
-const int trigger_pin = 48;
+
+const int trigger_pin = 4;
 int lastTriggerState = 1;
+
+
+//-----------vibration-----------------------
+const int vib_pin = 14; // GPIO pin connected to the Vibration Module
 
 
 //---------slow down processes---------
 unsigned long previousMillis = 0; // Stores the last time data was processed
-const unsigned long interval = 100; // Interval in milliseconds (100 ms for 10 FPS)
+const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 10 FPS) (16.67ms for 60FPS) (20.82ms for 48FPS) (11.11ms for 90FPS)
 
 
 //----------ESP now----------- 
 // uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 hub divice 2
 uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
+// uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -106,11 +115,11 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL); // SDA:GPIO 20 and SCL:GPIO 21
   Wire.setClock(400000);  // 400kHz I2C clock. Comment this line if having compilation difficulties
 
-  USBSerial.begin(115200);
+  Serial.begin(115200);
   delay(500);  // Allow some time for USB initialization
-  USBSerial.println("USBSerial is working!");
+  Serial.println("Serial is working!");
 
-  // while(!USBSerial)
+  // while(!Serial)
   //   ;  // wait for Leonardo enumeration, others continue immediately
   mpu.initialize();
 
@@ -118,8 +127,7 @@ void setup() {
   pinMode(INTERRUPT_PIN, INPUT);  // W Setup the interrupt pin as a input
   devStatus = mpu.dmpInitialize();
   mpu.setXGyroOffset(83);  // last set 18/10/2024 using uduino_zero script
-  mpu.setYGyroOffset(26);  //
-  mpu.setZGyroOffset(73);
+  mpu.setYGyroOffset(26);  //offsetst braeadboard  mpu.setZGyroOffset(73);
   mpu.setZAccelOffset(1521);  // W
 
   if (devStatus == 0) {
@@ -137,14 +145,14 @@ void setup() {
     packetSize = mpu.dmpGetFIFOPacketSize();
   } else {
     // Error
-    USBSerial.println("MPU Error!");
+    Serial.println("MPU Error!");
   }
 
   //ESP now
   WiFi.mode(WIFI_STA);
 
   if (esp_now_init() != ESP_OK) {
-    USBSerial.println("Error initializing ESP-NOW");
+    Serial.println("Error initializing ESP-NOW");
     return;
   }
   esp_now_register_send_cb(OnDataSent); // set wich func to execute on data sent event
@@ -154,7 +162,7 @@ void setup() {
   peerInfo.encrypt = false;
        
   if (esp_now_add_peer(&peerInfo) != ESP_OK){
-    USBSerial.println("Failed to add peer");
+    Serial.println("Failed to add peer");
     return;
   }
   esp_now_register_recv_cb(OnDataRecv); // set wich func to execute on data recieve event
@@ -168,12 +176,12 @@ void setup() {
 
   //-------------------OLED-----------------
   if (display.begin(oled_i2c_Address, true)) {  // Try to initialize the display
-    USBSerial.println("OLED display initialized successfully.");
+    Serial.println("OLED display initialized successfully.");
     display.clearDisplay();            // Clear any previous data from the display buffer
     initializingAnimation();           
     updateDisplay();
   } else {
-    USBSerial.println("Failed to initialize OLED display.");
+    Serial.println("Failed to initialize OLED display.");
     // Handle the failure case, like displaying an error or retrying
   }
 
@@ -187,14 +195,14 @@ void setup() {
 // ================================================================
 
 void loop() {
-  unsigned long currentMillis = millis();
+  // unsigned long currentMillis = millis();
   
-  // Check if it's time to process data
-  if (currentMillis - previousMillis >= interval) {
-    previousMillis = currentMillis;
+  // // Check if it's time to process data
+  // if (currentMillis - previousMillis >= interval) {
+  //   previousMillis = currentMillis;
 
     processData();
-  }
+  // }
 }
 
 
@@ -241,7 +249,8 @@ void initializingAnimation() {
 }
 
 void updateDisplay() {
-  display.clearDisplay();
+  display.clearDisplay(); 
+  display.setRotation(2);
 
   int bulletX = 6; 
   int bulletY = (SCREEN_HEIGHT - 6) - 4; 
@@ -283,22 +292,22 @@ void reload(const uint8_t *incomingData, int len) {
 
   if(values[0] == "b"){
     bulletsLeft = values[2].toInt();
-    USBSerial.print("Parsed bulletsLeft: ");
-    USBSerial.println(bulletsLeft);
+    Serial.print("Parsed bulletsLeft: ");
+    Serial.println(bulletsLeft);
     updateDisplay();
   }
   else if (values[0] == "rb") {  // Check that it's the correct type
     magCapacity = values[1].toInt();
     bulletsLeft = values[2].toInt();
 
-    USBSerial.print("Parsed magCapacity: ");
-    USBSerial.println(magCapacity);
-    USBSerial.print("Parsed bulletsLeft: ");
-    USBSerial.println(bulletsLeft);
+    Serial.print("Parsed magCapacity: ");
+    Serial.println(magCapacity);
+    Serial.print("Parsed bulletsLeft: ");
+    Serial.println(bulletsLeft);
     reloadingAnimation();
     updateDisplay();
   } else {
-    USBSerial.println("Error: Unsupported data type");
+    Serial.println("Error: Unsupported data type");
   }  
 }
 
@@ -355,15 +364,15 @@ void SendRfidEspNow(String data){
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1);
 
   if (result == ESP_OK) {
-    USBSerial.println("RFID data sent successfully");
+    Serial.println("RFID data sent successfully");
   } else {
-    USBSerial.println("Error sending RFID data");
+    Serial.println("Error sending RFID data");
   }
 }
 
 String ReadMrfc522(){
   if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-    USBSerial.println("Card detected!");
+    Serial.println("Card detected!");
     
     // Read data from the tag
     String data = readMultipleBlocks();
@@ -390,18 +399,18 @@ String readMultipleBlocks() {
     MFRC522::StatusCode status = mfrc522.MIFARE_Read(block, buffer, &bufferLength);
     if (status == MFRC522::STATUS_OK) {
       // Debug: print the raw block data
-      USBSerial.print("Block ");
-      USBSerial.print(block);
-      USBSerial.print(": ");
+      Serial.print("Block ");
+      Serial.print(block);
+      Serial.print(": ");
       for (byte i = 0; i < bufferLength; i++) {
-        USBSerial.print("0x");
+        Serial.print("0x");
         if (buffer[i] < 0x10) {
-          USBSerial.print("0");
+          Serial.print("0");
         }
-        USBSerial.print(buffer[i], HEX);
-        USBSerial.print(" ");
+        Serial.print(buffer[i], HEX);
+        Serial.print(" ");
       }
-      USBSerial.println();
+      Serial.println();
       
       // Append the readable characters from the block to the completePayload
       for (byte i = 0; i < bufferLength; i++) {
@@ -410,19 +419,19 @@ String readMultipleBlocks() {
         }
       }
     } else {
-      USBSerial.print("Failed to read block ");
-      USBSerial.println(block);
+      Serial.print("Failed to read block ");
+      Serial.println(block);
       return "";
     }
   }
 
-  USBSerial.print("Complete Payload: ");
-  USBSerial.println(completePayload);
+  Serial.print("Complete Payload: ");
+  Serial.println(completePayload);
 
   // Extract specific parts from the payload
   String extractedData = extractStringByRange(completePayload, '/', 1, 3); // Read 2nd part till 4th
-  USBSerial.print("Selected Data: ");
-  USBSerial.println(extractedData);
+  Serial.print("Selected Data: ");
+  Serial.println(extractedData);
 
   return extractedData;
 }
@@ -480,9 +489,9 @@ void SendTriggerStateEspNow(int State) {
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1);
 
   if (result == ESP_OK) {
-    USBSerial.println("Trigger state sent successfully");
+    Serial.println("Trigger state sent successfully");
   } else {
-    USBSerial.println("Error sending trigger state");
+    Serial.println("Error sending trigger state");
   }
 }
 
@@ -515,32 +524,32 @@ void Vibration() {
 // ================================================================
 
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  USBSerial.print("\r\nDelivery Status: ");
-  USBSerial.println(status == ESP_NOW_SEND_SUCCESS ? "Deliverd Successfully" : "Delivery Fail");
-  if (status ==0){
-    success = "Delivery Success :)";
-  }
-  else{
-    success = "Delivery Fail :(";
-  }
+  // Serial.print("\r\nDelivery Status: ");
+  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Deliverd Successfully" : "Delivery Fail");
+  // if (status ==0){
+  //   success = "Delivery Success :)";
+  // }
+  // else{
+  //   success = "Delivery Fail :(";
+  // }
 }
 
 void OnDataRecv(const esp_now_recv_info* recv_info, const uint8_t *incomingData, int len) {
-  USBSerial.print("\r\nDataReceived: ");
+  Serial.print("\r\nDataReceived: ");
 
   // Print data in hexadecimal format
-  USBSerial.print("Hex data: ");
+  Serial.print("Hex data: ");
   for (int i = 0; i < len; i++) {
-    USBSerial.print(incomingData[i], HEX);
-    USBSerial.print(" ");
+    Serial.print(incomingData[i], HEX);
+    Serial.print(" ");
   }
   
   // Print data as characters
-  USBSerial.print("\nASCII data: ");
+  Serial.print("\nASCII data: ");
   for (int i = 0; i < len; i++) {
-    USBSerial.print((char)incomingData[i]);
+    Serial.print((char)incomingData[i]);
   }
-  USBSerial.println();
+  Serial.println();
 
   //func to execute on data receive
   reload(incomingData, len);
@@ -554,7 +563,7 @@ void OnDataRecv(const esp_now_recv_info* recv_info, const uint8_t *incomingData,
 
 void MPU(){
   if (!dmpReady) {
-    USBSerial.println("IMU not connected.");
+    Serial.println("IMU not connected.");
     delay(10);
     return;
   }
@@ -588,34 +597,34 @@ void SendQuaternionEspNow() {
                   + "/" + String(q.z, 4);
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1); // Send the message
   
-  if (result == ESP_OK) {
-    USBSerial.println("Quaternion data sent successfully");
-  } else {
-    USBSerial.println("Error sending quaternion data");
-  }
+  // if (result == ESP_OK) {
+  //   Serial.println("Quaternion data sent successfully");
+  // } else {
+  //   Serial.println("Error sending quaternion data");
+  // }
 }
 
 // void SendQuaternion() {
 //   mpu.dmpGetQuaternion(&q, fifoBuffer);
-//   USBSerial.print("r/");
-//   USBSerial.print(q.w, 4);
-//   USBSerial.print("/");
-//   USBSerial.print(q.x, 4);
-//   USBSerial.print("/");
-//   USBSerial.print(q.y, 4);
-//   USBSerial.print("/");
-//   USBSerial.println(q.z, 4);
+//   Serial.print("r/");
+//   Serial.print(q.w, 4);
+//   Serial.print("/");
+//   Serial.print(q.x, 4);
+//   Serial.print("/");
+//   Serial.print(q.y, 4);
+//   Serial.print("/");
+//   Serial.println(q.z, 4);
 // }
 
 // void SendEuler() {
 //   // display Euler angles in degrees
 //   mpu.dmpGetQuaternion(&q, fifoBuffer);
 //   mpu.dmpGetEuler(euler, &q);
-//   USBSerial.print(euler[0] * 180 / M_PI);
-//   USBSerial.print("/");
-//   USBSerial.print(euler[1] * 180 / M_PI);
-//   USBSerial.print("/");
-//   USBSerial.println(euler[2] * 180 / M_PI);
+//   Serial.print(euler[0] * 180 / M_PI);
+//   Serial.print("/");
+//   Serial.print(euler[1] * 180 / M_PI);
+//   Serial.print("/");
+//   Serial.println(euler[2] * 180 / M_PI);
 // }
 
 // void SendYawPitchRoll() {
@@ -623,11 +632,11 @@ void SendQuaternionEspNow() {
 //   mpu.dmpGetQuaternion(&q, fifoBuffer);
 //   mpu.dmpGetGravity(&gravity, &q);
 //   mpu.dmpGetYawPitchRoll(ypr, &q, &gravity);
-//   USBSerial.print(ypr[0] * 180 / M_PI);
-//   USBSerial.print("/");
-//   USBSerial.print(ypr[1] * 180 / M_PI);
-//   USBSerial.print("/");
-//   USBSerial.println(ypr[2] * 180 / M_PI);
+//   Serial.print(ypr[0] * 180 / M_PI);
+//   Serial.print("/");
+//   Serial.print(ypr[1] * 180 / M_PI);
+//   Serial.print("/");
+//   Serial.println(ypr[2] * 180 / M_PI);
 // }
 
 // void SendRealAccel() {
@@ -636,12 +645,12 @@ void SendQuaternionEspNow() {
 //   mpu.dmpGetAccel(&aa, fifoBuffer);
 //   mpu.dmpGetGravity(&gravity, &q);
 //   mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-//   USBSerial.print("a/");
-//   USBSerial.print(aaReal.x);
-//   USBSerial.print("/");
-//   USBSerial.print(aaReal.y);
-//   USBSerial.print("/");
-//   USBSerial.println(aaReal.z);
+//   Serial.print("a/");
+//   Serial.print(aaReal.x);
+//   Serial.print("/");
+//   Serial.print(aaReal.y);
+//   Serial.print("/");
+//   Serial.println(aaReal.z);
 // }
 
 // void SendWorldAccel() {
@@ -652,10 +661,10 @@ void SendQuaternionEspNow() {
 //   mpu.dmpGetGravity(&gravity, &q);
 //   mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
 //   mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-//   USBSerial.print("a/");
-//   USBSerial.print(aaWorld.x);
-//   USBSerial.print("/");
-//   USBSerial.print(aaWorld.y);
-//   USBSerial.print("/");
-//   USBSerial.println(aaWorld.z);
+//   Serial.print("a/");
+//   Serial.print(aaWorld.x);
+//   Serial.print("/");
+//   Serial.print(aaWorld.y);
+//   Serial.print("/");
+//   Serial.println(aaWorld.z);
 // }
