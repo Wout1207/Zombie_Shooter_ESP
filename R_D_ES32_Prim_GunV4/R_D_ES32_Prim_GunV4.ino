@@ -29,6 +29,8 @@ int lastTriggerState = 1;
 // Task Handles
 TaskHandle_t mpuTaskHandle;
 TaskHandle_t secondaryTaskHandle;
+static float prev_w = 0.0f, prev_x = 0.0f, prev_y = 0.0f, prev_z = 0.0f;
+float range = 0.01f; // Adjust the range as needed
 
 
 //-----------vibration-----------------------
@@ -36,8 +38,8 @@ const int vib_pin = 14; // GPIO pin connected to the Vibration Module
 
 
 //---------slow down processes---------
-// unsigned long previousMillis = 0; // Stores the last time data was processed
-// const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 10 FPS) (16.67ms for 60FPS) (20.82ms for 48FPS) (11.11ms for 90FPS)
+unsigned long previousMillis = 0; // Stores the last time data was processed
+const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 10 FPS) (16.67ms for 60FPS) (20.82ms for 48FPS) (11.11ms for 90FPS)
 
 
 //----------ESP now----------- 
@@ -234,7 +236,11 @@ void loop() {
 
 void mpuTask(void *parameter) {
     while (true) {
+      // unsigned long currentMillis = millis();
+      // if (currentMillis - previousMillis >= interval) {
+      // previousMillis = currentMillis;
       MPU();
+      // }
     }
 }
 
@@ -621,17 +627,35 @@ void MPU(){
 void SendQuaternionEspNow() {
   mpu.dmpGetQuaternion(&q, fifoBuffer);
 
-  String message = "r/" + String(q.w, 4) 
-                  + "/" + String(q.x, 4) 
-                  + "/" + String(q.y, 4) 
-                  + "/" + String(q.z, 4);
-  esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1); // Send the message
-  
+  if (!isWithinRange(q.w, prev_w, range) ||
+        !isWithinRange(q.x, prev_x, range) ||
+        !isWithinRange(q.y, prev_y, range) ||
+        !isWithinRange(q.z, prev_z, range)) 
+    {
+        
+    
+
+    // Update previous values
+    prev_w = q.w;
+    prev_x = q.x;
+    prev_y = q.y;
+    prev_z = q.z;
+
+    String message = "r/" + String(q.w, 4) 
+                    + "/" + String(q.x, 4) 
+                    + "/" + String(q.y, 4) 
+                    + "/" + String(q.z, 4);
+    esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1); // Send the message
+    }
   // if (result == ESP_OK) {
   //   Serial.println("Quaternion data sent successfully");
   // } else {
   //   Serial.println("Error sending quaternion data");
   // }
+}
+
+bool isWithinRange(float value1, float value2, float range) {
+    return fabs(value1 - value2) <= range;
 }
 
 // void SendQuaternion() {
