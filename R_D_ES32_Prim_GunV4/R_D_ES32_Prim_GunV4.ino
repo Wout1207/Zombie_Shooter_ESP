@@ -330,10 +330,10 @@ void reload(const uint8_t *incomingData, int len) {
     magCapacity = values[1].toInt();
     bulletsLeft = values[2].toInt();
 
-    Serial.print("Parsed magCapacity: ");
-    Serial.println(magCapacity);
-    Serial.print("Parsed bulletsLeft: ");
-    Serial.println(bulletsLeft);
+    // Serial.print("Parsed magCapacity: ");
+    // Serial.println(magCapacity);
+    // Serial.print("Parsed bulletsLeft: ");
+    // Serial.println(bulletsLeft);
     reloadingAnimation();
     updateDisplay();
   } else {
@@ -372,7 +372,7 @@ void reloadingAnimation() {
   display.setCursor(0, 0);
   display.println("Reload Complete!");
   display.display();
-  delay(1000);
+  delay(300);
   display.clearDisplay();
 }
 
@@ -393,16 +393,16 @@ void SendRfidEspNow(String data){
   String message = "mg/" + data;
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1);
 
-  if (result == ESP_OK) {
-    Serial.println("RFID data sent successfully");
-  } else {
-    Serial.println("Error sending RFID data");
-  }
+  // if (result == ESP_OK) {
+  //   Serial.println("RFID data sent successfully");
+  // } else {
+  //   Serial.println("Error sending RFID data");
+  // }
 }
 
 String ReadMrfc522(){
   if (mfrc522.PICC_IsNewCardPresent() && mfrc522.PICC_ReadCardSerial()) {
-    Serial.println("Card detected!");
+    // Serial.println("Card detected!");
     
     // Read data from the tag
     String data = readMultipleBlocks();
@@ -429,18 +429,18 @@ String readMultipleBlocks() {
     MFRC522::StatusCode status = mfrc522.MIFARE_Read(block, buffer, &bufferLength);
     if (status == MFRC522::STATUS_OK) {
       // Debug: print the raw block data
-      Serial.print("Block ");
-      Serial.print(block);
-      Serial.print(": ");
-      for (byte i = 0; i < bufferLength; i++) {
-        Serial.print("0x");
-        if (buffer[i] < 0x10) {
-          Serial.print("0");
-        }
-        Serial.print(buffer[i], HEX);
-        Serial.print(" ");
-      }
-      Serial.println();
+      // Serial.print("Block ");
+      // Serial.print(block);
+      // Serial.print(": ");
+      // for (byte i = 0; i < bufferLength; i++) {
+      //   Serial.print("0x");
+      //   if (buffer[i] < 0x10) {
+      //     Serial.print("0");
+      //   }
+      //   Serial.print(buffer[i], HEX);
+      //   Serial.print(" ");
+      // }
+      // Serial.println();
       
       // Append the readable characters from the block to the completePayload
       for (byte i = 0; i < bufferLength; i++) {
@@ -449,19 +449,19 @@ String readMultipleBlocks() {
         }
       }
     } else {
-      Serial.print("Failed to read block ");
-      Serial.println(block);
+      // Serial.print("Failed to read block ");
+      // Serial.println(block);
       return "";
     }
   }
 
-  Serial.print("Complete Payload: ");
-  Serial.println(completePayload);
+  // Serial.print("Complete Payload: ");
+  // Serial.println(completePayload);
 
   // Extract specific parts from the payload
   String extractedData = extractStringByRange(completePayload, '/', 1, 3); // Read 2nd part till 4th
-  Serial.print("Selected Data: ");
-  Serial.println(extractedData);
+  // Serial.print("Selected Data: ");
+  // Serial.println(extractedData);
 
   return extractedData;
 }
@@ -518,11 +518,11 @@ void SendTriggerStateEspNow(int State) {
   String message = "tr/" + String(State);
   esp_err_t result = esp_now_send(broadcastAddress, (uint8_t *) message.c_str(), message.length() + 1);
 
-  if (result == ESP_OK) {
-    Serial.println("Trigger state sent successfully");
-  } else {
-    Serial.println("Error sending trigger state");
-  }
+  // if (result == ESP_OK) {
+  //   Serial.println("Trigger state sent successfully");
+  // } else {
+  //   Serial.println("Error sending trigger state");
+  // }
 }
 
 // ================================================================
@@ -565,21 +565,21 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 }
 
 void OnDataRecv(const esp_now_recv_info* recv_info, const uint8_t *incomingData, int len) {
-  Serial.print("\r\nDataReceived: ");
+  // Serial.print("\r\nDataReceived: ");
 
   // Print data in hexadecimal format
-  Serial.print("Hex data: ");
-  for (int i = 0; i < len; i++) {
-    Serial.print(incomingData[i], HEX);
-    Serial.print(" ");
-  }
+  // Serial.print("Hex data: ");
+  // for (int i = 0; i < len; i++) {
+  //   Serial.print(incomingData[i], HEX);
+  //   Serial.print(" ");
+  // }
   
-  // Print data as characters
-  Serial.print("\nASCII data: ");
-  for (int i = 0; i < len; i++) {
-    Serial.print((char)incomingData[i]);
-  }
-  Serial.println();
+  // // Print data as characters
+  // Serial.print("\nASCII data: ");
+  // for (int i = 0; i < len; i++) {
+  //   Serial.print((char)incomingData[i]);
+  // }
+  // Serial.println();
 
   //func to execute on data receive
   reload(incomingData, len);
