@@ -44,8 +44,8 @@ const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 1
 
 //----------ESP now----------- 
 // uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 hub divice 2
-uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
-// uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
+// uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
+uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -513,11 +513,13 @@ String extractStringByRange(String data, char delimiter, int start, int end) {
 
 void Trigger(){
   int triggerState = digitalRead(trigger_pin);
-  if (triggerState == 0 || (lastTriggerState == 0 && triggerState == 1)) {
+  // if (triggerState == 0 || (lastTriggerState == 0 && triggerState == 1)) {
+  if (triggerState == 0) {  
     lastTriggerState = triggerState;
     SendTriggerStateEspNow(triggerState);
   }
 }
+
 
 // send button state via ESP-NOW
 void SendTriggerStateEspNow(int State) {
@@ -535,22 +537,25 @@ void SendTriggerStateEspNow(int State) {
 // ===                   VIBRATION FUNCTIONS                      ===
 // ================================================================
 
-void Vibration() {
-  unsigned long lastVibrationTime = 0; // Stores the last time the vibration started
-  const unsigned long vibrationDuration = 300; // Duration for which the vibration should be active
-  bool isVibrating = false; // Tracks whether the vibration is currently active
+unsigned long lastVibrationTime = 0; 
+bool isVibrating = false;           
 
-  // Check if the trigger state is active
-    if (lastTriggerState == 1 && !isVibrating) {
-        digitalWrite(vib_pin, HIGH); // Start vibration
-        isVibrating = true; // Set vibration state
-        lastVibrationTime = millis(); // Record the start time
+void Vibration() {
+    const unsigned long vibrationDuration = 300; 
+
+    int triggerState = digitalRead(trigger_pin);
+
+    if (triggerState == LOW && !isVibrating) { 
+        Serial.println("Activating vibration...");
+        digitalWrite(vib_pin, HIGH); 
+        isVibrating = true;
+        lastVibrationTime = millis(); 
     }
 
-    // Check if the vibration duration has elapsed
     if (isVibrating && millis() - lastVibrationTime >= vibrationDuration) {
-        digitalWrite(vib_pin, LOW); // Stop vibration
-        isVibrating = false; // Reset vibration state
+        Serial.println("Deactivating vibration...");
+        digitalWrite(vib_pin, LOW);
+        isVibrating = false;
     }
 }
 
