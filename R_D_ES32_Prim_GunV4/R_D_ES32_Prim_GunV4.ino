@@ -21,8 +21,14 @@ MPU6050 mpu;
 #define INTERRUPT_PIN 47  // W Set the interrupt pin for MPU
 #define mpu_i2c_Address 0x68 //adress of the mpu
 
-const int trigger_pin = 4;
+const int trigger_pin = 48;
 int lastTriggerState = 1;
+
+
+//-----------------mpu--------------------
+// Task Handles
+TaskHandle_t mpuTaskHandle;
+TaskHandle_t secondaryTaskHandle;
 
 
 //-----------vibration-----------------------
@@ -30,8 +36,8 @@ const int vib_pin = 14; // GPIO pin connected to the Vibration Module
 
 
 //---------slow down processes---------
-unsigned long previousMillis = 0; // Stores the last time data was processed
-const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 10 FPS) (16.67ms for 60FPS) (20.82ms for 48FPS) (11.11ms for 90FPS)
+// unsigned long previousMillis = 0; // Stores the last time data was processed
+// const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 10 FPS) (16.67ms for 60FPS) (20.82ms for 48FPS) (11.11ms for 90FPS)
 
 
 //----------ESP now----------- 
@@ -185,8 +191,13 @@ void setup() {
     // Handle the failure case, like displaying an error or retrying
   }
 
-  //-------------------Vibration motor--------------
+  //-------------------Vibration motor----------------
   pinMode(vib_pin, OUTPUT); // Set the vibration pin as output
+
+
+  //-------------------FreeRTOS Tasks------------------
+  xTaskCreatePinnedToCore(mpuTask, "MPU Task", 4096, NULL, 2, &mpuTaskHandle, 0);
+  xTaskCreatePinnedToCore(secondaryTask, "Secondary Task", 4096, NULL, 1, &secondaryTaskHandle, 1);
 }
 
 
@@ -201,25 +212,44 @@ void loop() {
   // if (currentMillis - previousMillis >= interval) {
   //   previousMillis = currentMillis;
 
-    processData();
+    // processData();
   // }
 }
 
 
-void processData(){
-  //-----------------MPU-----------------
-  MPU();
+// void processData(){
+//   //-----------------MPU-----------------
+//   MPU();
 
-  //-----------------Trigger-----------------
-  Trigger();
+//   //-----------------Trigger-----------------
+//   Trigger();
 
-  //-----------------mags(RFID)-----------------
-  RFID();
+//   //-----------------mags(RFID)-----------------
+//   RFID();
 
-  //-----------------vibration-----------------
-  Vibration();
+//   //-----------------vibration-----------------
+//   Vibration();
+// }
+
+
+void mpuTask(void *parameter) {
+    while (true) {
+      MPU();
+    }
 }
 
+void secondaryTask(void *parameter) {
+    while (true) {
+        //-----------------Trigger-----------------
+        Trigger();
+
+        //-----------------mags(RFID)-----------------
+        RFID();
+
+        //-----------------vibration-----------------
+        Vibration();
+    }
+}
 
 
 // ================================================================
