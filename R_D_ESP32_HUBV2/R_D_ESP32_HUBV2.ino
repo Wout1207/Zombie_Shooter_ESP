@@ -1,10 +1,11 @@
+//GIT version
+
 #include <esp_now.h>
 #include <WiFi.h>
 
 // uint8_t broadcastAddressPrimGun[] = {0xDC, 0xDA, 0x0C, 0x64, 0x7F, 0xB8}; // send to esp32s3 divice 1 
 // uint8_t broadcastAddressPrimGun[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // prim gun 3
 uint8_t broadcastAddressPrimGun[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 divice 2
-
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -51,7 +52,7 @@ void OnDataRecv(const esp_now_recv_info* recv_info, const uint8_t *incomingData,
 }
  
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(1000000);
   WiFi.mode(WIFI_STA);
 
   if (esp_now_init() != ESP_OK) {
