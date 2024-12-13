@@ -1,7 +1,8 @@
 #include <esp_now.h>
 #include <WiFi.h>
-// #include "esp_timer.h"
-#define CONVERSIONS_PER_PIN 10
+#include <esp_timer.h>
+#define CONVERSIONS_PER_PIN 35
+#define LED_PIN 37
 
 // Variables for the grenades
 bool grenadeThrown = false;
@@ -19,11 +20,6 @@ uint16_t pressureSheetLowThresholds[] = {0, 0, 0, 0};
 uint16_t pressureSheetHighThresholds[] = {0, 0, 0, 0};
 bool pressureSheetToggle[] = {false, false, false, false};
 
-// Variables for the timer
-// volatile bool timerFlag = false;
-// esp_timer_handle_t timerHandle;
-uint8_t counter = 0;
-
 // Variables for adc
 // Calculate how many pins are declared in the array - needed as input for the setup function of ADC Continuous
 uint8_t adc_pins_count = 10;
@@ -34,6 +30,16 @@ adc_continuous_data_t *result = NULL;
 // ISR Function that will be triggered when ADC conversion is done
 void ARDUINO_ISR_ATTR adcComplete() {
   adc_coversion_done = true;
+}
+
+// Variables for led strip
+esp_timer_handle_t myTimer; // Declare the timer handle globally
+bool isLedOn = true;
+// Timer callback function
+void onTimer(void* arg) {
+  esp_timer_stop(myTimer);
+  digitalWrite(LED_PIN, HIGH);
+  Serial.println("Timer stopped.");
 }
 
 // choose the correct address for the hub
@@ -67,9 +73,24 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
 
 void setup() {
   Serial.begin(115200);
+  pinMode(LED_PIN, OUTPUT);
+  digitalWrite(LED_PIN, HIGH);
+  
+  // Configure and initialize the timer
+  esp_timer_create_args_t timerConfig = {
+      .callback = &onTimer, // Function to call when the timer triggers
+      .arg = nullptr,       // Optional argument (unused here)
+      .name = "FixedTimer"  // Name for debugging
+  };
+  // Create the timer
+  esp_timer_create(&timerConfig, &myTimer);
+  
   espNowSetup();
   // timerSetup();
   adcSetup();
+  while (!adc_coversion_done) ;
+  adc_coversion_done = false;
+  setReferences();
 }
 
 // ================================================================
@@ -79,23 +100,8 @@ void setup() {
 void loop() {
   if (adc_coversion_done == true) {
     adc_coversion_done = false;
-    if (counter < 9) {
-      photoTransistorsLoop();
-      // counter++;
-    }
-    else {
-      setReferences();
-      counter = 0;
-    }
+    photoTransistorsLoop();
   }
-
-
-  // if (timerFlag) {
-  //   timerFlag = false;
-  //   resetReferences();
-  // }
-
-  // delay(5);
 }
   
 // ================================================================
@@ -136,10 +142,9 @@ void adcSetup() {
   analogContinuousSetAtten(ADC_11db);
   // Setup ADC Continuous with following input:
   // array of pins, count of the pins, how many conversions per pin in one cycle will happen, sampling frequency, callback function
-  analogContinuous(photoTransistorPins, adc_pins_count, CONVERSIONS_PER_PIN, 20000, &adcComplete);
+  analogContinuous(photoTransistorPins, adc_pins_count, CONVERSIONS_PER_PIN, 83333, &adcComplete); //20000
   // Start ADC Continuous conversions
   analogContinuousStart();
-  counter = 9;
 }
 
 // ================================================================
@@ -176,28 +181,6 @@ void setReferences() {
     Serial.println("Error occurred during reading data. Set Core Debug Level to error or lower for more information.");
   }
 }
-
-// ================================================================
-// ===                    TIMER CALLBACK                        ===
-// ================================================================
-
-// void timerCallback(void* arg) {
-//   timerFlag = true;
-// }
-
-// ================================================================
-// ===                      TIMER SETUP                         ===
-// ================================================================
-
-// void timerSetup() {
-//   // Configure the timer
-//   const esp_timer_create_args_t timerArgs = {
-//     .callback = &timerCallback,
-//     .arg = NULL,
-//   };
-//   esp_timer_create(&timerArgs, &timerHandle);
-//   esp_timer_start_periodic(timerHandle, 60000000); // Time is in microseconds
-// }
 
 // ================================================================
 // ===                 PRESSURE SHEETS LOOP                     ===
@@ -247,22 +230,22 @@ void photoTransistorsLoop() {
       if (!grenadeDetected[i]) {
         if (photoTransistorValues[i] > photoTransistorReferences[i] + photoTransistorHighDeviations[i] ||
             photoTransistorValues[i] < photoTransistorReferences[i] - photoTransistorHighDeviations[i]) {
-          // Serial.print("Pin: ");
-          // Serial.print(photoTransistorPins[i]);
-          // Serial.print(" Value: ");
-          // Serial.print(photoTransistorValues[i]);
-          // Serial.println(" Grenade detected");
+          Serial.print("Pin: ");
+          Serial.print(photoTransistorPins[i]);
+          Serial.print(" Value: ");
+          Serial.print(photoTransistorValues[i]);
+          Serial.println(" Grenade detected");
           grenadeDetected[i] = true;
         }
       }
       else {
         if (photoTransistorValues[i] < photoTransistorReferences[i] + photoTransistorLowDeviations[i] &&
             photoTransistorValues[i] > photoTransistorReferences[i] - photoTransistorLowDeviations[i]) {
-          // Serial.print("Pin: ");
-          // Serial.print(photoTransistorPins[i]);
-          // Serial.print(" Value: ");
-          // Serial.print(photoTransistorValues[i]);
-          // Serial.println(" No Grenade detected");
+          Serial.print("Pin: ");
+          Serial.print(photoTransistorPins[i]);
+          Serial.print(" Value: ");
+          Serial.print(photoTransistorValues[i]);
+          Serial.println(" No Grenade detected");
           grenadeDetected[i] = false;
         }
       }
@@ -278,11 +261,15 @@ void photoTransistorsLoop() {
       char message[10];
       snprintf(message, sizeof(message), "g");
       esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
+      digitalWrite(LED_PIN, LOW);
+      // esp_timer_start_once(myTimer, 100000);
       Serial.println("Grenade thrown! Message sent.");
     }
     // Reset grenadeThrown to false if all grenades are cleared
     if (grenadeThrown && allGrenadesCleared) {
       grenadeThrown = false;
+      digitalWrite(LED_PIN, LOW);
+      esp_timer_start_once(myTimer, 100000);
       Serial.println("Grenades cleared.");
     }
 
