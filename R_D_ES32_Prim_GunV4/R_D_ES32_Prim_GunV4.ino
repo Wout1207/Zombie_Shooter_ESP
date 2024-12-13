@@ -12,10 +12,10 @@
 #include <Adafruit_SH110X.h>
 
 // difine the I2C pins
-#define I2C_SDA 6
-#define I2C_SCL 7
-// #define I2C_SDA 20 // actual gun
-// #define I2C_SCL 21 // actual gun
+// #define I2C_SDA 6
+// #define I2C_SCL 7
+#define I2C_SDA 20 // actual gun
+#define I2C_SCL 21 // actual gun
 
 MPU6050 mpu;
 #define INTERRUPT_PIN 47  // W Set the interrupt pin for MPU
@@ -44,8 +44,9 @@ const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 1
 
 //----------ESP now----------- 
 // uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 hub divice 2
-// uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
-uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
+uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
+// uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
+// uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xC9, 0xA4}; // send to esp32s3 divice 4
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -123,7 +124,7 @@ void setup() {
   Wire.begin(I2C_SDA, I2C_SCL); // SDA:GPIO 20 and SCL:GPIO 21
   Wire.setClock(400000);  // 400kHz I2C clock. Comment this line if having compilation difficulties
 
-  Serial.begin(115200);
+  Serial.begin(1000000);
   delay(500);  // Allow some time for USB initialization
   Serial.println("Serial is working!");
 
@@ -134,9 +135,16 @@ void setup() {
   //mpu.initialize(mpu_i2c_Address);
   pinMode(INTERRUPT_PIN, INPUT);  // W Setup the interrupt pin as a input
   devStatus = mpu.dmpInitialize();
+  
+  //test breadboord:
   mpu.setXGyroOffset(83);  // last set 18/10/2024 using uduino_zero script
   mpu.setYGyroOffset(26);  //offsetst braeadboard  mpu.setZGyroOffset(73);
   mpu.setZAccelOffset(1521);  // W
+
+  //Actual gun
+  // mpu.setXGyroOffset(83);  // last set 18/10/2024 using uduino_zero script
+  // mpu.setYGyroOffset(26);  //offsetst braeadboard  mpu.setZGyroOffset(73);
+  // mpu.setZAccelOffset(1521);  // W
 
   if (devStatus == 0) {
     // W Calibration Time: generate offsets and calibrate our MPU6050
@@ -371,14 +379,14 @@ void reloadingAnimation() {
   for (int i = 0; i <= SCREEN_WIDTH; i += 8) {
     display.fillRect(0, SCREEN_HEIGHT - 8, i, 8, SH110X_WHITE);
     display.display();
-    delay(100);
+    delay(20);
   }
 
   display.clearDisplay();
   display.setCursor(0, 0);
   display.println("Reload Complete!");
   display.display();
-  delay(300);
+  delay(10);
   display.clearDisplay();
 }
 
@@ -546,14 +554,14 @@ void Vibration() {
     int triggerState = digitalRead(trigger_pin);
 
     if (triggerState == LOW && !isVibrating) { 
-        Serial.println("Activating vibration...");
+        // Serial.println("Activating vibration...");
         digitalWrite(vib_pin, HIGH); 
         isVibrating = true;
         lastVibrationTime = millis(); 
     }
 
     if (isVibrating && millis() - lastVibrationTime >= vibrationDuration) {
-        Serial.println("Deactivating vibration...");
+        // Serial.println("Deactivating vibration...");
         digitalWrite(vib_pin, LOW);
         isVibrating = false;
     }
