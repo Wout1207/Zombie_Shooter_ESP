@@ -44,9 +44,11 @@ const unsigned long interval = 11.111; // Interval in milliseconds (100 ms for 1
 
 //----------ESP now----------- 
 // uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xCC, 0x9C}; // send to esp32s3 hub divice 2
-uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
-// uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
+// uint8_t broadcastAddress[] = {0x84, 0xF7, 0x03, 0x89, 0x5E, 0x50}; // send to esp32s2 hub 2
+uint8_t broadcastAddress[] = {0x24, 0xEC, 0x4A, 0x01, 0x32, 0xA0}; // send to esp32s3 divice 3
 // uint8_t broadcastAddress[] = {0xDC, 0xDA, 0x0C, 0x63, 0xC9, 0xA4}; // send to esp32s3 divice 4
+// uint8_t broadcastAddress[] = {0x48, 0xE31, 0xB7, 0x93, 0x17, 0xA5C}; // send to esp32c3 divice 1
+
 String success;
 
 esp_now_peer_info_t peerInfo;
@@ -137,14 +139,14 @@ void setup() {
   devStatus = mpu.dmpInitialize();
   
   //test breadboord:
-  mpu.setXGyroOffset(83);  // last set 18/10/2024 using uduino_zero script
-  mpu.setYGyroOffset(26);  //offsetst braeadboard  mpu.setZGyroOffset(73);
-  mpu.setZAccelOffset(1521);  // W
-
-  //Actual gun
   // mpu.setXGyroOffset(83);  // last set 18/10/2024 using uduino_zero script
   // mpu.setYGyroOffset(26);  //offsetst braeadboard  mpu.setZGyroOffset(73);
   // mpu.setZAccelOffset(1521);  // W
+
+   //Actual gun
+  mpu.setXGyroOffset(-16);  // last set 18/10/2024 using uduino_zero script
+  mpu.setYGyroOffset(-124);  //offsetst braeadboard  mpu.setZGyroOffset(73);
+  mpu.setZAccelOffset(16371);  // W
 
   if (devStatus == 0) {
     // W Calibration Time: generate offsets and calibrate our MPU6050
