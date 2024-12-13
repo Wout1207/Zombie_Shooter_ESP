@@ -34,12 +34,26 @@ void ARDUINO_ISR_ATTR adcComplete() {
 
 // Variables for led strip
 esp_timer_handle_t myTimer; // Declare the timer handle globally
-bool isLedOn = true;
+int timerLength = 150000;
+int triggerCount = 0;       // Counter for timer callbacks
+const int maxTriggers = 7;  // Maximum number of times the timer should trigger
+
 // Timer callback function
-void onTimer(void* arg) {
-  esp_timer_stop(myTimer);
-  digitalWrite(LED_PIN, HIGH);
-  Serial.println("Timer stopped.");
+void onTimer(void* arg) { // Add a `void*` parameter as required by `esp_timer_cb_t`
+  triggerCount++;
+  if (triggerCount % 2 == 1) {
+    digitalWrite(LED_PIN, HIGH);
+  }
+  else {
+    digitalWrite(LED_PIN, LOW);
+  }
+
+  if (triggerCount >= maxTriggers) {
+    // Stop the timer after it has triggered maxTriggers times
+    esp_timer_stop(myTimer);
+    Serial.println("Timer stopped.");
+    triggerCount = 0;
+  }
 }
 
 // choose the correct address for the hub
@@ -262,14 +276,13 @@ void photoTransistorsLoop() {
       snprintf(message, sizeof(message), "g");
       esp_err_t result = esp_now_send(hubAddress, (uint8_t *)message, strlen(message));
       digitalWrite(LED_PIN, LOW);
-      // esp_timer_start_once(myTimer, 100000);
+      esp_timer_start_periodic(myTimer, timerLength);
       Serial.println("Grenade thrown! Message sent.");
     }
     // Reset grenadeThrown to false if all grenades are cleared
     if (grenadeThrown && allGrenadesCleared) {
       grenadeThrown = false;
       digitalWrite(LED_PIN, LOW);
-      esp_timer_start_once(myTimer, 100000);
       Serial.println("Grenades cleared.");
     }
 
